@@ -30,9 +30,17 @@ def insert_new_question(db, question_id):
         db.questions.save({'question_id': question_id, 'touched': FLAG.UNTOUCHED})
 
 
+def change_question_status(db, question_id, status):
+    db.questions.update({'question_id': int(question_id)}, {'$set': {'touched': status}})
+
+
 def insert_new_user(db, user_id):
     if db.users.find({'user_id': user_id}).count() == 0:
         db.users.save({'user_id': user_id, 'touched': FLAG.UNTOUCHED})
+
+
+def change_user_status(db, user_id: str, status):
+    db.users.update({'user_id': user_id},{'$set':{'touched': status}})
 
 
 def insert_answer(db, answer_id, author, question_id, comments_count, content):
