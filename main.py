@@ -83,18 +83,17 @@ class Crawler:
         self.insert_answer_list_page(answer_list_soup, user_id)
 
         # insert all others, if any
+        answers = 20
         if answer_page_count > 1:
             page_range = range(2, answer_page_count + 1)
             for page_num in page_range:
                 current_page_link = answer_page_base + "?page=" + str(page_num)
                 r = self.session.get(current_page_link)
                 soup = BeautifulSoup(r.content.decode('utf-8'), BS_PARSER)
-                answer_count = self.insert_answer_list_page(soup, user_id)
-                # FIXME: add log
-                log.debug("User {} have {} answer in page {}".format(user_id, answer_count, page_num))
+                answers += self.insert_answer_list_page(soup, user_id)
 
         change_user_status(db=self.db, user_id=user_id, status=FLAG.FINISHED)
-        log.info('done' + ': ' + user_id)
+        log.info("Inserted {} answers for user {}.".format(answers, user_id))
 
     # Start from single Question page
     # - all answers
