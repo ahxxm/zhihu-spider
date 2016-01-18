@@ -1,3 +1,5 @@
 # Zhihu Spider
 
-Toy for Python 3.5.1.
+Toy , works under Python 3.5.1.
+
+Requires MongoDB and existing session cookie, check `settings.py` for detail.
