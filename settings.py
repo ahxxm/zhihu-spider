@@ -7,7 +7,7 @@ SESSION_FILENAME = "session.p"
 # Only z_c0 is required
 COOKIE_KEY = "z_c0"
 COOKIE_VALUE = """
-values_after_"z_c0="
+REPLACE_THIS_LINE_WITH_values_after_"z_c0="
 """
 
 CHROME_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_2) AppleWebKit/537.36 " \
