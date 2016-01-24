@@ -193,7 +193,7 @@ class Crawler:
         self.db.users.update_many({'touched': FLAG.IN_USE}, {'$set': {'touched': FLAG.UNTOUCHED}})
 
         while True:
-            # self.fetch_users()
+            self.fetch_users()
             self.fetch_questions()
 
 if __name__ == "__main__":

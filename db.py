@@ -14,7 +14,7 @@ class FLAG:
 
 
 def get_user_cursor(db, count) -> pymongo.cursor.Cursor:
-    cursor = db.questions.find({'touched': FLAG.UNTOUCHED}).limit(count)
+    cursor = db.users.find({'touched': FLAG.UNTOUCHED}).limit(count)
     return cursor
 
 
