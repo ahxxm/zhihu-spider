@@ -219,17 +219,17 @@ class Crawler:
 
         # show status
         answer_count = self.db.answers.count()
-        log.info("Existing answers: {}" % answer_count)
+        log.info("Existing answers: %s" % answer_count)
 
         question_count = self.db.questions.count()
         question_to_explore = self.db.questions.find({'touched': FLAG.UNTOUCHED}).count()
         explored_question = question_count - question_to_explore
-        log.info("%s questions: %s new, % crawled." % (question_count, question_to_explore, explored_question))
+        log.info("%s questions: %s new, %s crawled." % (question_count, question_to_explore, explored_question))
 
         user_count = self.db.users.count()
         user_to_explore = self.db.users.find({'touched': FLAG.UNTOUCHED}).count()
         explored_user = user_count - user_to_explore
-        log.info("%s users: %s new, % crawled." % (user_count, user_to_explore, explored_user))
+        log.info("%s users: %s new, %s crawled." % (user_count, user_to_explore, explored_user))
 
         while True:
             try:
