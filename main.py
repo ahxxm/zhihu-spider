@@ -5,17 +5,32 @@ from logger import log
 from session import get_or_create_session
 from settings import EXPLORE_USER_COUNT, EXPLORE_QUESTION_COUNT, CONCURRENCY
 
+import asyncio
 import re
 
 from bs4 import BeautifulSoup
-from multiprocessing.dummy import Pool as ThreadPool
+
+
+session = get_or_create_session()
+sem = asyncio.Semaphore(CONCURRENCY)
+
+
+@asyncio.coroutine
+def get_page_body(url: str) -> str:
+    yield from sem.acquire()
+    rsp = yield from session.get(url)
+    data = yield from rsp.read()
+    content = data.decode('utf-8')
+    rsp.close()
+    sem.release()
+    return content
 
 
 class Crawler:
 
     def __init__(self):
         self.db = db_client
-        self.session = get_or_create_session()
+        self.loop = asyncio.get_event_loop()
 
         # Seed user and necessary index
         insert_new_user(self.db, user_id=Magic.seed_user)
@@ -32,9 +47,11 @@ class Crawler:
     # - all answers, page by page
     # - question id, if they are new
 
+    @asyncio.coroutine
     def first_answer_page(self, user_id: str) -> (int, str, BeautifulSoup):
         max_page_link = "http://www.zhihu.com/people/" + user_id + "/answers"
-        soup = BeautifulSoup(self.session.get(max_page_link).content, BS_PARSER)
+        content = yield from get_page_body(max_page_link)
+        soup = BeautifulSoup(content, BS_PARSER)
         try:
             k = soup.find("div", class_=Magic.UserProfile.answer_paginator).get_text()
             max_page = [int(j) for j in re.findall('\d+', k)][-1]
@@ -66,34 +83,35 @@ class Crawler:
         # get all answer of that page
         all_answers = soup.find_all("div", class_=Magic.UserProfile.answer)
 
-        # No no answer found, mark as complete
-        if len(all_answers) < 1:
-            log.info("User %s does not have answers yet." % answer_author)
-
         # Extract answer item, and add questions if they aren't in db
         for answer_item in all_answers:
             self.parse_and_insert_single_answer(user_id=answer_author, answer_item=answer_item)
 
         return len(all_answers)
 
+    @asyncio.coroutine
     def insert_user_all_answers(self, user_id: str):
         change_user_status(db=self.db, user_id=user_id, status=FLAG.IN_USE)
 
-        answer_page_count, answer_page_base, answer_list_soup = self.first_answer_page(user_id=user_id)
+        answer_page_count, answer_page_base, answer_list_soup = yield from self.first_answer_page(user_id=user_id)
         self.insert_answer_list_page(answer_list_soup, user_id)
 
         # insert all others, if any
-        answers = 20
+        answers = 0
         if answer_page_count > 1:
+            answers += 20
             page_range = range(2, answer_page_count + 1)
             for page_num in page_range:
                 current_page_link = answer_page_base + "?page=" + str(page_num)
-                r = self.session.get(current_page_link)
-                soup = BeautifulSoup(r.content.decode('utf-8'), BS_PARSER)
+                content = yield from get_page_body(current_page_link)
+                soup = BeautifulSoup(content, BS_PARSER)
                 answers += self.insert_answer_list_page(soup, user_id)
 
         change_user_status(db=self.db, user_id=user_id, status=FLAG.FINISHED)
-        log.info("Inserted {} answers for user {}.".format(answers, user_id))
+
+        if answers != 0:
+            log.debug("Inserted {} answers for user {}.".format(answers, user_id))
+        return True
 
     # Start from single Question page
     # - all answers
@@ -101,8 +119,18 @@ class Crawler:
 
     def update_question_detail(self, soup_content, question_id):
         title = soup_content.find(Magic.Question.title).get_text().strip()
-        detail = soup_content.find('div', class_=Magic.Question.question_detail).get_text().strip()
-        follower = int(soup_content.find('div', class_=Magic.Question.follower).a.get_text())
+
+        detail = soup_content.find('div', class_=Magic.Question.question_detail)
+        if detail:
+            detail = detail.get_text().strip()
+        else:
+            detail = ""
+
+        follower = soup_content.find('div', class_=Magic.Question.follower)
+        if follower:
+            follower = Magic.number.findall(follower.get_text())[0]
+        else:
+            follower = 0
         self.db.questions.update_one({'question_id': int(question_id)},
                                      {'$set': {'title': title, 'detail': detail, 'follower': follower}})
 
@@ -129,19 +157,19 @@ class Crawler:
 
         return author, comments_count, content
 
-    def update_question_insert_answer(self, question_id):
+    @asyncio.coroutine
+    def update_question_insert_answer(self, question_id: int):
         change_question_status(db=self.db, question_id=question_id, status=FLAG.IN_USE)
-        log.info("Updating untouched question {}".format(question_id))
 
         # Update question detail
         question_url = 'http://www.zhihu.com/question/' + str(question_id)
-        question_content = self.session.get(question_url).content.decode('utf-8')
+        question_content = yield from get_page_body(question_url)
 
         q_soup = BeautifulSoup(question_content, BS_PARSER)
         if type(q_soup.find(Magic.Question.title)) is not None:
             self.update_question_detail(q_soup, question_id)
         else:
-            return  # 404
+            return True  # 404
 
         # First 50 answers
         answers = q_soup.findAll('div', class_=Magic.Question.answer_div)
@@ -162,40 +190,55 @@ class Crawler:
             insert_new_user(self.db, user)
 
         change_question_status(db=self.db, question_id=question_id, status=FLAG.FINISHED)
+        return True
 
     def fetch_users(self):
         untouched_user_list = get_user_cursor(self.db, EXPLORE_USER_COUNT)
-        for user in untouched_user_list:
-            user = user["user_id"]
-            self.insert_user_all_answers(user)
+        user_id_list = [user["user_id"] for user in untouched_user_list]
 
-        log.info("Finished crawling {} users.".format(len(EXPLORE_USER_COUNT)))
+        tasks = asyncio.wait([self.insert_user_all_answers(user_id)
+                              for user_id in user_id_list])
+        self.loop.run_until_complete(tasks)
+
+        log.info("Finished crawling {} users.".format(EXPLORE_USER_COUNT))
 
     def fetch_questions(self):
         questions_list_cursor = get_untouched_question_cursor(self.db, EXPLORE_QUESTION_COUNT)
-        for question_item in questions_list_cursor:
-            question = question_item['question_id']
-            self.update_question_insert_answer(question)
+        question_list = [question_item["question_id"] for question_item in questions_list_cursor]
+        tasks = asyncio.wait([self.update_question_insert_answer(question_id)
+                              for question_id in question_list])
+        self.loop.run_until_complete(tasks)
 
         log.info("Finished crawling {} questions.".format(EXPLORE_QUESTION_COUNT))
-
-        # Multi processing version
-        # pool = ThreadPool(CONCURRENCY)
-        # question_list = [question['question_id'] for question in questions_list_cursor]
-        # _ = pool.map(self.update_question_insert_answer, questions_list)
-        # pool.close()
-        # pool.join()
 
     def run(self):
 
         # reset all unfinished user/questions
-        self.db.answers.update_many({'touched': FLAG.IN_USE}, {'$set': {'touched': FLAG.UNTOUCHED}})
         self.db.users.update_many({'touched': FLAG.IN_USE}, {'$set': {'touched': FLAG.UNTOUCHED}})
+        self.db.questions.update_many({'touched': FLAG.IN_USE}, {'$set': {'touched': FLAG.UNTOUCHED}})
+
+        # show status
+        answer_count = self.db.answers.count()
+        log.info("Existing answers: {}" % answer_count)
+
+        question_count = self.db.questions.count()
+        question_to_explore = self.db.questions.find({'touched': FLAG.UNTOUCHED}).count()
+        explored_question = question_count - question_to_explore
+        log.info("%s questions: %s new, % crawled." % (question_count, question_to_explore, explored_question))
+
+        user_count = self.db.users.count()
+        user_to_explore = self.db.users.find({'touched': FLAG.UNTOUCHED}).count()
+        explored_user = user_count - user_to_explore
+        log.info("%s users: %s new, % crawled." % (user_count, user_to_explore, explored_user))
 
         while True:
-            self.fetch_users()
-            self.fetch_questions()
+            try:
+                self.fetch_users()
+                self.fetch_questions()
+            except KeyboardInterrupt:
+                break
 
 if __name__ == "__main__":
     crawler = Crawler()
     crawler.run()
+    session.close()

@@ -15,6 +15,6 @@ CHROME_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_2) AppleWebKit/537.36 
 
 # Go through this amount of users' answers.
 EXPLORE_USER_COUNT = 200
-EXPLORE_QUESTION_COUNT = 1000
+EXPLORE_QUESTION_COUNT = 100
 
 CONCURRENCY = 10
