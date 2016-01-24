@@ -135,8 +135,10 @@ class Crawler:
         follower = soup_content.find('div', class_=Magic.Question.follower)
         try:
             follower = Magic.number.findall(follower.get_text())[0]
-        except IndexError:
-            log.info("Question %s didn't have title." % question_id)
+        except (IndexError, AttributeError):
+            # either None object have no get_text
+            # or no result found..
+            log.info("Question %s didn't have follower." % question_id)
             follower = 0
         self.db.questions.update_one({'question_id': int(question_id)},
                                      {'$set': {'title': title, 'detail': detail, 'follower': follower}})
