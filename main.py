@@ -134,7 +134,7 @@ class Crawler:
         log.info("Updating untouched question {}".format(question_id))
 
         # Update question detail
-        question_url = 'http://www.zhihu.com/question/' + question_id
+        question_url = 'http://www.zhihu.com/question/' + str(question_id)
         question_content = self.session.get(question_url).content.decode('utf-8')
 
         q_soup = BeautifulSoup(question_content, BS_PARSER)
@@ -193,7 +193,7 @@ class Crawler:
         self.db.users.update_many({'touched': FLAG.IN_USE}, {'$set': {'touched': FLAG.UNTOUCHED}})
 
         while True:
-            self.fetch_users()
+            # self.fetch_users()
             self.fetch_questions()
 
 if __name__ == "__main__":
