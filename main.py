@@ -118,18 +118,25 @@ class Crawler:
     # - new users
 
     def update_question_detail(self, soup_content, question_id):
-        title = soup_content.find(Magic.Question.title).get_text().strip()
+        title = soup_content.find(Magic.Question.title)
+        if title:
+            title = title.get_text().strip()
+        else:
+            log.error("Question %s didn't have title." % question_id)
+            title = ""
 
         detail = soup_content.find('div', class_=Magic.Question.question_detail)
         if detail:
             detail = detail.get_text().strip()
         else:
+            log.error("Question %s didn't have details." % question_id)
             detail = ""
 
         follower = soup_content.find('div', class_=Magic.Question.follower)
         if follower:
             follower = Magic.number.findall(follower.get_text())[0]
         else:
+            log.info("Question %s didn't have title." % question_id)
             follower = 0
         self.db.questions.update_one({'question_id': int(question_id)},
                                      {'$set': {'title': title, 'detail': detail, 'follower': follower}})
