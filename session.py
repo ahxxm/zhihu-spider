@@ -61,12 +61,12 @@ def get_or_create_session() -> aiohttp.ClientSession:
         cookies = {COOKIE_KEY: COOKIE_VALUE}
         session = aiohttp.ClientSession(headers={"User-Agent": CHROME_UA},
                                         connector=conn, cookies=cookies)
-        # session.cookies[COOKIE_KEY] = COOKIE_VALUE
+        session._cookie_jar.update_cookies({COOKIE_KEY: COOKIE_VALUE.strip()})
 
         # update cookies by visit website
-        #validate_session(session)
-        #with open(SESSION_FILENAME, "wb") as session_dump:
-        #    pickle.dump(session.cookies, session_dump)
+        validate_session(session)
+        with open(SESSION_FILENAME, "wb") as session_dump:
+            pickle.dump(session.cookies, session_dump)
 
     return session
 
@@ -83,5 +83,6 @@ if __name__ == "__main__":
     loop = asyncio.get_event_loop()
     ff = asyncio.wait([test(session)])
     rr = loop.run_until_complete(ff)
-    import ipdb; ipdb.set_trace()
-    print(1)
+    bb = rr[0].pop()
+    aa = bb.result()
+    print(aa.decode())
