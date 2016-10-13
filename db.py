@@ -38,7 +38,7 @@ def insert_new_user(db, user_id):
 
 
 def change_user_status(db, user_id: str, status):
-    db.users.update_one({'user_id': user_id}, {'$set':{'touched': status}})
+    db.users.update_one({'user_id': user_id}, {'$set': {'touched': status}})
 
 
 def insert_answer(db, answer_id, author, question_id, comments_count, content):
