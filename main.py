@@ -122,14 +122,14 @@ class Crawler:
         if title:
             title = title.get_text().strip()
         else:
-            log.error("Question %s didn't have title." % question_id)
+            log.debug("Question %s didn't have title." % question_id)
             title = ""
 
         detail = soup_content.find('div', class_=Magic.Question.question_detail)
         if detail:
             detail = detail.get_text().strip()
         else:
-            log.error("Question %s didn't have details." % question_id)
+            log.debug("Question %s didn't have details." % question_id)
             detail = ""
 
         follower = soup_content.find('div', class_=Magic.Question.follower)
@@ -138,7 +138,7 @@ class Crawler:
         except (IndexError, AttributeError):
             # either None object have no get_text
             # or no result found..
-            log.info("Question %s didn't have follower." % question_id)
+            log.debug("Question %s didn't have follower." % question_id)
             follower = 0
         self.db.questions.update_one({'question_id': int(question_id)},
                                      {'$set': {'title': title, 'detail': detail, 'follower': follower}})
