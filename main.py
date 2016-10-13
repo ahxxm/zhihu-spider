@@ -1,4 +1,5 @@
-from db import insert_new_question, insert_new_user, insert_answer, get_user_cursor, get_untouched_question_cursor, FLAG
+from db import insert_new_question, insert_new_user, insert_answer, \
+    get_user_cursor, get_untouched_question_cursor, FLAG
 from db import db_client, change_user_status, change_question_status
 from constants import Magic, BS_PARSER
 from logger import log
@@ -53,7 +54,8 @@ class Crawler:
         content = yield from get_page_body(max_page_link)
         soup = BeautifulSoup(content, BS_PARSER)
         try:
-            k = soup.find("div", class_=Magic.UserProfile.answer_paginator).get_text()
+            k = soup.find("div",
+                          class_=Magic.UserProfile.answer_paginator).get_text()
             max_page = [int(j) for j in re.findall('\d+', k)][-1]
         except:
             max_page = 1
@@ -152,13 +154,15 @@ class Crawler:
             content = Magic.harmony_answer
 
         try:
-            author_temp = str(bs_answer.find('a', class_=Magic.Question.author_div))
+            author_temp = str(bs_answer.find('a',
+                                             class_=Magic.Question.author_div))
             author = Magic.Question.author_name.findall(author_temp)[0]
         except IndexError:
             author = 'Anonymous'
 
         try:
-            comment_div = str(bs_answer.find('a', class_=Magic.Question.comment_div))
+            comment_div = str(bs_answer.find('a',
+                                             class_=Magic.Question.comment_div))
             comments_count = int(Magic.number.findall(comment_div)[0])
         except IndexError:
             # no comments yet
@@ -168,7 +172,8 @@ class Crawler:
 
     @asyncio.coroutine
     def update_question_insert_answer(self, question_id: int):
-        change_question_status(db=self.db, question_id=question_id, status=FLAG.IN_USE)
+        change_question_status(db=self.db,
+                               question_id=question_id, status=FLAG.IN_USE)
 
         # Update question detail
         question_url = 'http://www.zhihu.com/question/' + str(question_id)
@@ -198,7 +203,9 @@ class Crawler:
         for user in users:
             insert_new_user(self.db, user)
 
-        change_question_status(db=self.db, question_id=question_id, status=FLAG.FINISHED)
+        change_question_status(db=self.db,
+                               question_id=question_id,
+                               status=FLAG.FINISHED)
         return True
 
     def fetch_users(self):
