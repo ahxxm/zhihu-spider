@@ -3,5 +3,8 @@ python:
   - "3.5"
 dist: trusty
 sudo: false
+cache:
+  directories:
+    - "/home/travis/.cache/"
 script:
   - ./test.sh
