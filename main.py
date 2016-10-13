@@ -66,10 +66,10 @@ class Crawler:
         question_title_element = answer_item.find(Magic.hyperlink, class_=Magic.UserProfile.question)
         answer_id = int(Magic.answer_id_in_answer.findall(str(question_title_element))[0])
         if self.db.answers.find({'answer_id': answer_id}).count() == 0:
-            question_id = int(Magic.UserProfile.question_id_in_user_profile.findall(str(question_title_element))[0])
+            question_id = int(Magic.UserProfile.profile_qid.findall(str(question_title_element))[0])
             insert_new_question(self.db, question_id)
             try:
-                answer_content_str = answer_item.find(class_=Magic.UserProfile.answer_content_class_in_user_profile)
+                answer_content_str = answer_item.find(class_=Magic.UserProfile.content_class)
                 answer_content_str = answer_content_str.get_text()
             except AttributeError:
                 answer_content_str = Magic.harmony_answer
@@ -95,16 +95,19 @@ class Crawler:
     def insert_user_all_answers(self, user_id: str):
         change_user_status(db=self.db, user_id=user_id, status=FLAG.IN_USE)
 
-        answer_page_count, answer_page_base, answer_list_soup = yield from self.first_answer_page(user_id=user_id)
-        self.insert_answer_list_page(answer_list_soup, user_id)
+        # answer page count,
+        # base url of this user's answer
+        # first page's soup
+        page_count, base_url, soup = yield from self.first_answer_page(user_id=user_id)
+        self.insert_answer_list_page(soup, user_id)
 
         # insert all others, if any
         answers = 0
-        if answer_page_count > 1:
+        if page_count > 1:
             answers += 20
-            page_range = range(2, answer_page_count + 1)
+            page_range = range(2, page_count + 1)
             for page_num in page_range:
-                current_page_link = answer_page_base + "?page=" + str(page_num)
+                current_page_link = base_url + "?page=" + str(page_num)
                 content = yield from get_page_body(current_page_link)
                 soup = BeautifulSoup(content, BS_PARSER)
                 answers += self.insert_answer_list_page(soup, user_id)
@@ -240,7 +243,8 @@ class Crawler:
         question_count = self.db.questions.count()
         question_to_explore = self.db.questions.find({'touched': FLAG.UNTOUCHED}).count()
         explored_question = question_count - question_to_explore
-        log.info("%s questions: %s new, %s crawled." % (question_count, question_to_explore, explored_question))
+        log.info("%s questions: %s new, %s crawled." %
+                 (question_count, question_to_explore, explored_question))
 
         user_count = self.db.users.count()
         user_to_explore = self.db.users.find({'touched': FLAG.UNTOUCHED}).count()
