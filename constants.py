@@ -16,11 +16,14 @@ class Magic:
 
         answer = "zm-item"
         answer_paginator = "zm-invite-pager"
-        answer_content_class_in_user_profile = "content hidden"
         comments_count = " meta-item toggle-comment"
         question = "question_link"
 
-        question_id_in_user_profile = re.compile("(?<=question\/)\d+")
+        # question id
+        profile_qid = re.compile("(?<=question\/)\d+")
+
+        # answer content class
+        content_class = "content hidden"
 
     class Question:
 

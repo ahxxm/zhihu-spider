@@ -1,4 +1,5 @@
-from db import insert_new_question, insert_new_user, insert_answer, get_user_cursor, get_untouched_question_cursor, FLAG
+from db import insert_new_question, insert_new_user, insert_answer, \
+    get_user_cursor, get_untouched_question_cursor, FLAG
 from db import db_client, change_user_status, change_question_status
 from constants import Magic, BS_PARSER
 from logger import log
@@ -53,7 +54,8 @@ class Crawler:
         content = yield from get_page_body(max_page_link)
         soup = BeautifulSoup(content, BS_PARSER)
         try:
-            k = soup.find("div", class_=Magic.UserProfile.answer_paginator).get_text()
+            k = soup.find("div",
+                          class_=Magic.UserProfile.answer_paginator).get_text()
             max_page = [int(j) for j in re.findall('\d+', k)][-1]
         except:
             max_page = 1
@@ -64,10 +66,10 @@ class Crawler:
         question_title_element = answer_item.find(Magic.hyperlink, class_=Magic.UserProfile.question)
         answer_id = int(Magic.answer_id_in_answer.findall(str(question_title_element))[0])
         if self.db.answers.find({'answer_id': answer_id}).count() == 0:
-            question_id = int(Magic.UserProfile.question_id_in_user_profile.findall(str(question_title_element))[0])
+            question_id = int(Magic.UserProfile.profile_qid.findall(str(question_title_element))[0])
             insert_new_question(self.db, question_id)
             try:
-                answer_content_str = answer_item.find(class_=Magic.UserProfile.answer_content_class_in_user_profile)
+                answer_content_str = answer_item.find(class_=Magic.UserProfile.content_class)
                 answer_content_str = answer_content_str.get_text()
             except AttributeError:
                 answer_content_str = Magic.harmony_answer
@@ -93,16 +95,19 @@ class Crawler:
     def insert_user_all_answers(self, user_id: str):
         change_user_status(db=self.db, user_id=user_id, status=FLAG.IN_USE)
 
-        answer_page_count, answer_page_base, answer_list_soup = yield from self.first_answer_page(user_id=user_id)
-        self.insert_answer_list_page(answer_list_soup, user_id)
+        # answer page count,
+        # base url of this user's answer
+        # first page's soup
+        page_count, base_url, soup = yield from self.first_answer_page(user_id=user_id)
+        self.insert_answer_list_page(soup, user_id)
 
         # insert all others, if any
         answers = 0
-        if answer_page_count > 1:
+        if page_count > 1:
             answers += 20
-            page_range = range(2, answer_page_count + 1)
+            page_range = range(2, page_count + 1)
             for page_num in page_range:
-                current_page_link = answer_page_base + "?page=" + str(page_num)
+                current_page_link = base_url + "?page=" + str(page_num)
                 content = yield from get_page_body(current_page_link)
                 soup = BeautifulSoup(content, BS_PARSER)
                 answers += self.insert_answer_list_page(soup, user_id)
@@ -152,13 +157,15 @@ class Crawler:
             content = Magic.harmony_answer
 
         try:
-            author_temp = str(bs_answer.find('a', class_=Magic.Question.author_div))
+            author_temp = str(bs_answer.find('a',
+                                             class_=Magic.Question.author_div))
             author = Magic.Question.author_name.findall(author_temp)[0]
         except IndexError:
             author = 'Anonymous'
 
         try:
-            comment_div = str(bs_answer.find('a', class_=Magic.Question.comment_div))
+            comment_div = str(bs_answer.find('a',
+                                             class_=Magic.Question.comment_div))
             comments_count = int(Magic.number.findall(comment_div)[0])
         except IndexError:
             # no comments yet
@@ -168,7 +175,8 @@ class Crawler:
 
     @asyncio.coroutine
     def update_question_insert_answer(self, question_id: int):
-        change_question_status(db=self.db, question_id=question_id, status=FLAG.IN_USE)
+        change_question_status(db=self.db,
+                               question_id=question_id, status=FLAG.IN_USE)
 
         # Update question detail
         question_url = 'http://www.zhihu.com/question/' + str(question_id)
@@ -198,7 +206,9 @@ class Crawler:
         for user in users:
             insert_new_user(self.db, user)
 
-        change_question_status(db=self.db, question_id=question_id, status=FLAG.FINISHED)
+        change_question_status(db=self.db,
+                               question_id=question_id,
+                               status=FLAG.FINISHED)
         return True
 
     def fetch_users(self):
@@ -233,7 +243,8 @@ class Crawler:
         question_count = self.db.questions.count()
         question_to_explore = self.db.questions.find({'touched': FLAG.UNTOUCHED}).count()
         explored_question = question_count - question_to_explore
-        log.info("%s questions: %s new, %s crawled." % (question_count, question_to_explore, explored_question))
+        log.info("%s questions: %s new, %s crawled." %
+                 (question_count, question_to_explore, explored_question))
 
         user_count = self.db.users.count()
         user_to_explore = self.db.users.find({'touched': FLAG.UNTOUCHED}).count()
