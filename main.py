@@ -12,15 +12,15 @@ import re
 from bs4 import BeautifulSoup
 
 
-session = get_or_create_session()
+loop = asyncio.get_event_loop()
+session = loop.run_until_complete(get_or_create_session())
 sem = asyncio.Semaphore(CONCURRENCY)
 
 
-@asyncio.coroutine
-def get_page_body(url: str) -> str:
-    yield from sem.acquire()
-    rsp = yield from session.get(url)
-    data = yield from rsp.read()
+async def get_page_body(url: str) -> str:
+    await sem.acquire()
+    rsp = await session.get(url)
+    data = await rsp.read()
     content = data.decode('utf-8')
     rsp.close()
     sem.release()
@@ -48,10 +48,9 @@ class Crawler:
     # - all answers, page by page
     # - question id, if they are new
 
-    @asyncio.coroutine
-    def first_answer_page(self, user_id: str) -> (int, str, BeautifulSoup):
+    async def first_answer_page(self, user_id: str) -> (int, str, BeautifulSoup):
         max_page_link = "http://www.zhihu.com/people/" + user_id + "/answers"
-        content = yield from get_page_body(max_page_link)
+        content = await get_page_body(max_page_link)
         soup = BeautifulSoup(content, BS_PARSER)
         try:
             k = soup.find("div",
@@ -91,14 +90,13 @@ class Crawler:
 
         return len(all_answers)
 
-    @asyncio.coroutine
-    def insert_user_all_answers(self, user_id: str):
+    async def insert_user_all_answers(self, user_id: str):
         change_user_status(db=self.db, user_id=user_id, status=FLAG.IN_USE)
 
         # answer page count,
         # base url of this user's answer
         # first page's soup
-        page_count, base_url, soup = yield from self.first_answer_page(user_id=user_id)
+        page_count, base_url, soup = await self.first_answer_page(user_id=user_id)
         self.insert_answer_list_page(soup, user_id)
 
         # insert all others, if any
@@ -108,7 +106,7 @@ class Crawler:
             page_range = range(2, page_count + 1)
             for page_num in page_range:
                 current_page_link = base_url + "?page=" + str(page_num)
-                content = yield from get_page_body(current_page_link)
+                content = await get_page_body(current_page_link)
                 soup = BeautifulSoup(content, BS_PARSER)
                 answers += self.insert_answer_list_page(soup, user_id)
 
@@ -173,14 +171,13 @@ class Crawler:
 
         return author, comments_count, content
 
-    @asyncio.coroutine
-    def update_question_insert_answer(self, question_id: int):
+    async def update_question_insert_answer(self, question_id: int):
         change_question_status(db=self.db,
                                question_id=question_id, status=FLAG.IN_USE)
 
         # Update question detail
         question_url = 'http://www.zhihu.com/question/' + str(question_id)
-        question_content = yield from get_page_body(question_url)
+        question_content = await get_page_body(question_url)
 
         q_soup = BeautifulSoup(question_content, BS_PARSER)
         if type(q_soup.find(Magic.Question.title)) is not None:
