@@ -13,11 +13,11 @@ log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
 
 
-def validate_session(session: aiohttp.ClientSession) -> bool:
+async def validate_session(session: aiohttp.ClientSession) -> bool:
     # Validate by visit settings, anonymous user will be redirected
     # to login page.
     settings_url = "https://www.zhihu.com/settings/profile"
-    verify_rsp = yield from session.get(settings_url)
+    verify_rsp = await session.get(settings_url)
     verify_rsp.close()
 
     if not (verify_rsp.url == settings_url):
@@ -38,7 +38,6 @@ def gen_conn():
                                          use_dns_cache=True,
                                          share_cookies=True)
     else:
-        # FIXME:
         log.info("Using socks5: {}:{}".format(SOCKS_ADDR, SOCKS_PORT))
         from aiosocks.connector import proxy_connector
         addr = aiosocks.Socks5Addr(SOCKS_ADDR, SOCKS_PORT)
@@ -46,7 +45,7 @@ def gen_conn():
     return connector
 
 
-def get_or_create_session() -> aiohttp.ClientSession:
+async def get_or_create_session() -> aiohttp.ClientSession:
     conn = gen_conn()
     try:
         with open(SESSION_FILENAME, "rb") as session_dump:
@@ -64,25 +63,22 @@ def get_or_create_session() -> aiohttp.ClientSession:
         session._cookie_jar.update_cookies({COOKIE_KEY: COOKIE_VALUE.strip()})
 
         # update cookies by visit website
-        validate_session(session)
+        await validate_session(session)
         with open(SESSION_FILENAME, "wb") as session_dump:
             pickle.dump(session.cookies, session_dump)
 
     return session
 
 
-@asyncio.coroutine
-def test(session):
-    rsp = yield from session.get("https://www.zhihu.com/settings/profile")
-    r = yield from rsp.read()
-    return r
+async def test():
+    session = await get_or_create_session()
+    rsp = await session.get("https://www.zhihu.com/settings/profile")
+    r = await rsp.read()
+    print(r.decode())
+    session.close()
 
 
 if __name__ == "__main__":
-    session = get_or_create_session()
     loop = asyncio.get_event_loop()
-    ff = asyncio.wait([test(session)])
-    rr = loop.run_until_complete(ff)
-    bb = rr[0].pop()
-    aa = bb.result()
-    print(aa.decode())
+    loop.run_until_complete(test())
+    loop.close()
