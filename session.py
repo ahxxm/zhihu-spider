@@ -1,16 +1,12 @@
 import asyncio
 import aiohttp
 import aiosocks
-import logging
 import os
 import pickle
 
-
+from logger import log
 from settings import SESSION_FILENAME, COOKIE_KEY, COOKIE_VALUE, CHROME_UA
 from settings import SOCKS_ADDR, SOCKS_PORT
-
-log = logging.getLogger(__name__)
-log.setLevel(logging.DEBUG)
 
 
 async def validate_session(session: aiohttp.ClientSession) -> bool:
