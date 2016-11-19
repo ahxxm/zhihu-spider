@@ -1,6 +1,6 @@
 # Zhihu Spider
 
-[![Lint](https://travis-ci.org/ahxxm/cpp-exercise.svg)](https://travis-ci.org/ahxxm/cpp-exercise)
+[![Lint](https://travis-ci.org/ahxxm/zhihu-spider.svg)](https://travis-ci.org/ahxxm/zhihu-spider)
 
 Toy, works under Python(>3.5).
 
